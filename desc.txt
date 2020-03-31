@@ -1,0 +1,31 @@
+Padding(
+  child: Row(
+    children: <Widget>[
+      Expanded(
+	child: Container(child: ...),
+      )
+    ],
+  ),
+);
+
+
+code--start
+
+...<Normal Dart code>...
+
+
+<%
+Row(
+--start
+Expanded() 
+^ Container() 
+^ ChildWidget()
+--end
+)
+%>
+
+
+
+code--end
+
+

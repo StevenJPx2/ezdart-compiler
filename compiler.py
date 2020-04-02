@@ -1,5 +1,5 @@
 import re
-import time
+from argparse import ArgumentParser
 import os
 from collections import deque
 
@@ -88,41 +88,6 @@ class StringWidget(object):
         return False
 
     @staticmethod
-    def _find_widget_attr(string, has_child):
-        name_split = string.split("(", maxsplit=1)
-        name = name_split[0].strip()
-        string = name_split[1]
-        if has_child == 0:
-            string = string.split("~start", maxsplit=1)[0] + "~~"
-        if has_child == 1:
-            string = string.split("^", maxsplit=1)[0]
-
-        code_stack = deque()
-        index = 0
-        count = 0
-        attr = ""
-        while index < len(string):
-            char = string[index]
-            if char == "(":
-                count += 1
-            elif char == ")":
-                if count > 0:
-                    count -= 1
-
-                else:
-                    attr = "".join(code_stack)
-                    break
-            elif char == "~":
-                if string[index : index + 2] == "~~":
-                    attr = "".join(code_stack)
-                    break
-
-            code_stack.append(char)
-            index += 1
-
-        return attr
-
-    @staticmethod
     def _find_w(string, has_child, index):
         only_code = string.split("(", maxsplit=1)[1]
         if has_child == 0:
@@ -143,6 +108,27 @@ class StringWidget(object):
         name_split = string.split("(", maxsplit=1)
         name = name_split[0]
 
+        if "?" in name:
+            while index < len(string):
+                char = string[index]
+
+                child = self._find_child(string, index)
+
+                while child:
+                    index += self._find_end_of_fn(child)
+                    child = self._find_child(child, index)
+
+                if char == ":" and child is False:
+                    break
+
+                index += 1
+            else:
+                return False
+
+            in_0 = index + 1
+
+            return ":" + StringWidget(string[in_0:]).object_string
+
         return False
 
     def parse_obj_str(self, object_string):
@@ -162,17 +148,7 @@ class StringWidget(object):
 
         compiled_string = object_string.split("(", maxsplit=1)[0]
         tertiary_attributes = self._is_tertiary(object_string, index)
-        # widget_attributes = self._find_widget_attr(object_string, has_child)
-        if self._find_widget_attr(object_string, has_child) != self._find_w(
-            object_string, has_child, index
-        ):
-            print(
-                self._find_widget_attr(object_string, has_child),
-                self._find_w(object_string, has_child, index),
-                sep="\n",
-            )
         widget_attributes = self._find_w(object_string, has_child, index)
-        # print(f"Name: {compiled_string.strip()},", children, "\n\n=====\n\n")
 
         compiled_string += "(" + widget_attributes
 
@@ -190,6 +166,10 @@ class StringWidget(object):
 
         else:
             compiled_string += ")\n"
+
+        if tertiary_attributes:
+            compiled_string += tertiary_attributes
+
         return compiled_string
 
     @staticmethod
@@ -270,6 +250,39 @@ def parse_dart_code_to(ezdart_code, filename=None):
         print("Formatted!")
 
 
+def create_parser():
+    parser = ArgumentParser()
+    parser.add_argument("fd", help="Filename/directory of the edart file(s)")
+    parser.add_argument(
+        "-d",
+        "--destination",
+        help="By default, a dart file is created with the same filename. This is if you want a different filename",
+    )
+
+    return parser
+
+
+def traverse_dir(dir):
+    dir_path = os.popen(f"echo {dir}")[0]
+
+    try:
+        for path in os.listdir(dir_path):
+            traverse_dir(path)
+    except NotADirectoryError:
+        if os.path.splitext(dir_path)[0] == ".edart":
+            print(f" -  {dir_path}")
+            code_string = open(dir_path, "r").read()
+            parse_dart_code_to(code_string, os.path.splitext(dir_path)[0] + ".dart")
+
+
 if __name__ == "__main__":
-    CODE_STRING = open("test.edart", "r").read()
-    parse_dart_code_to(CODE_STRING, "test.dart")
+    args = create_parser().parse_args()
+
+    CODE_STRING = open(args.filename, "r").read()
+
+    if args.destination:
+        filename = args.destination + ".dart"
+    else:
+        filename = os.path.splitext(args.filename)[0] + ".dart"
+
+    parse_dart_code_to(CODE_STRING, filename)
